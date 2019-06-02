@@ -3,7 +3,7 @@ unit PrimesSieve;
 interface
 
 type
-  TNumberAlias = UInt64; //64-bit not signed integer
+  TNumberAlias = Cardinal; //Cardinal compatible with D7, else must be - NativeUInt - compiler depended size (x32 or x64) or partial arrays in sieve for UInt64
   TPrimesSieve = class
   private
     FSieve: array of Boolean;
@@ -27,22 +27,19 @@ begin
   FCurrent := 1;
   FSize := ASize;
 
-  SetLength(FSieve, FSize + 1);
-
-  for k := 2 to FSize do
-    FSieve[k] := True;
+  SetLength(FSieve, FSize - 1);
 
   k := 2;
   while (FSize >= (k * k)) do
   begin
-    if FSieve[k] then
+    if not FSieve[k] then
     begin
       l := k * k;
       while FSize >= l do
-        begin
-          FSieve[l] := False;
-          l := l + k;
-        end ;
+      begin
+        FSieve[l] := True;
+        l := l + k;
+      end;
     end;
 
     Inc(k);
@@ -58,10 +55,10 @@ end;
 
 function TPrimesSieve.GetNext(out ANumber: TNumberAlias): Boolean;
 begin
-  while (FCurrent <= FSize) do
+  while (FCurrent < FSize) do
   begin
     Inc(FCurrent);
-    if FSieve[FCurrent] then
+    if not FSieve[FCurrent] then
     begin
       ANumber := FCurrent;
       Result := True;

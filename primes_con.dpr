@@ -9,8 +9,10 @@ uses
   PrimesSieve in 'PrimesSieve.pas',
   WriterThread in 'WriterThread.pas';
 
-const
+const //CONFIGURATION
   EndValue = 1000000;
+  ThreadCount = 2;
+  ResultFileName = 'Result.txt';
 
 var
   PrimesPool: TPrimesWriterController;
@@ -20,7 +22,8 @@ begin
   try
     ReportMemoryLeaksOnShutdown := True;
     Ticks := GetTickCount;
-    PrimesPool := TPrimesWriterController.Create(1000000, 2, 'Result.txt');
+    PrimesPool := TPrimesWriterController.Create(EndValue, ThreadCount,
+      ResultFileName);
     try
       WriteLn(Format('Started at %s', [TimeToStr(Now)]));
       WriteLn('=======================');
