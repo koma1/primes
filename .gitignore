@@ -1,0 +1,9 @@
+####Standart Delphi project folder git ignores
+Win??/
+__*/
+*.identcache
+*.dproj.local
+
+#####Project ignore=
+primes_con.stat
+primes_con.res
