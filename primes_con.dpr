@@ -7,7 +7,7 @@ uses
   Math,
   Windows,
   PrimesSieve in 'PrimesSieve.pas',
-  WriterThread in 'WriterThread.pas';
+  PrimesWriting in 'PrimesWriting.pas';
 
 const //CONFIGURATION
   EndValue = 1000000;

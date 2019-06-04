@@ -1,4 +1,4 @@
-unit WriterThread;
+unit PrimesWriting;
 
 interface
 
@@ -15,13 +15,13 @@ type
     FThreads: TList;
     FFileStream: TFileStream;
     FCS: TCriticalSection;
+    procedure TerminateThreads;
     procedure ReleaseThread(Thread: TThread);
     function GetWorking: Boolean;
   public
-    constructor Create(
-      const AMaxValue: TNumberAlias = 1000000;
-      const AThreadCount: Integer = 2;
-      const AGeneralFileName: string = 'Result.txt');
+    constructor Create(const AMaxValue: TNumberAlias;
+      const AThreadCount: Integer;
+      const AGeneralFileName: string);
     destructor Destroy; override;
 
     property Working: Boolean read GetWorking;
@@ -47,13 +47,11 @@ type
 constructor TPrimesWriterThread.Create(const APool: TPrimesWriterController;
   const APersonalFileName: string);
 begin
-  inherited Create(True); //suspended
-  FreeOnTerminate := True;
-
-  FPool := APool;
   FFileStream := TFileStream.Create(APersonalFileName, fmCreate);
+  FPool := APool;
 
-  Resume; //depreacated, but compatible with D7
+  inherited Create;
+  FreeOnTerminate := True;
 end;
 
 destructor TPrimesWriterThread.Destroy;
@@ -99,13 +97,27 @@ constructor TPrimesWriterController.Create(const AMaxValue: TNumberAlias;
 var
   I: Integer;
 begin
-  FThreads := TList.Create;
-  FSieve := TPrimesSieve.Create(AMaxValue);
-  FFileStream := TFileStream.Create(AGeneralFileName, fmCreate);
-  FCS := TCriticalSection.Create;
+  try
+    FFileStream := TFileStream.Create(AGeneralFileName, fmCreate);
+    FSieve := TPrimesSieve.Create(AMaxValue);
+    FThreads := TList.Create;
+    FCS := TCriticalSection.Create;
+  except
+    FFileStream.Free;
+    FThreads.Free;
+    FSieve.Free;
+    FCS.Free;
 
-  for I := 1 to AThreadCount do
-    FThreads.Add(TPrimesWriterThread.Create(Self, Format('thread%d.txt', [I])));
+    raise;
+  end;
+
+  try
+    for I := 1 to AThreadCount do
+      FThreads.Add(TPrimesWriterThread.Create(Self, Format('thread%d.txt', [I])));
+  except //when excepted, we will terminate threads created before
+    TerminateThreads;
+    raise;
+  end;
 end;
 
 procedure TPrimesWriterController.ReleaseThread(Thread: TThread);
@@ -122,7 +134,7 @@ begin
   end;
 end;
 
-destructor TPrimesWriterController.Destroy;
+procedure TPrimesWriterController.TerminateThreads;
 var
   I: Integer;
 begin
@@ -131,6 +143,11 @@ begin
 
   while FThreads.Count > 0 do
     Sleep(100); //waiting while threads terminating
+end;
+
+destructor TPrimesWriterController.Destroy;
+begin
+  TerminateThreads;
 
   FreeAndNil(FThreads);
 
