@@ -16,10 +16,10 @@ type
     FFileStream: TFileStream;
     FCS: TCriticalSection;
     procedure TerminateThreads;
-    procedure ReleaseThread(Thread: TThread);
+    procedure RemoveThread(AThread: TThread);
     function GetWorking: Boolean;
   public
-    constructor Create(const AMaxValue: TNumberAlias;
+    constructor Create(const AMaxValue: TNumberValue;
       const AThreadCount: Integer;
       const AGeneralFileName: string);
     destructor Destroy; override;
@@ -32,67 +32,19 @@ implementation
 type
   TPrimesWriterThread = class(TThread)
   private
-    FPool: TPrimesWriterController;
+    FController: TPrimesWriterController;
     FFileStream: TFileStream;
   protected
     procedure Execute; override;
   public
-    constructor Create(const APool: TPrimesWriterController;
+    constructor Create(const AController: TPrimesWriterController;
       const APersonalFileName: string);
-    destructor Destroy; override; //1) remove it from pool list; 2) close personal file
+    destructor Destroy; override;
   end;
 
-{ TPrimesWriter }
+{ TPrimesWriterController }
 
-constructor TPrimesWriterThread.Create(const APool: TPrimesWriterController;
-  const APersonalFileName: string);
-begin
-  FFileStream := TFileStream.Create(APersonalFileName, fmCreate);
-  FPool := APool;
-
-  inherited Create;
-  FreeOnTerminate := True;
-end;
-
-destructor TPrimesWriterThread.Destroy;
-begin
-  FPool.ReleaseThread(Self); //notify pool about destruction
-
-  FFileStream.Free;
-
-  inherited;
-end;
-
-procedure TPrimesWriterThread.Execute;
-var
-  LValue: TNumberAlias;
-  LStr: AnsiString;
-  LRes: Boolean;
-begin
-  while (not Terminated) do
-  begin
-    FPool.FCS.Acquire;
-    try
-      LRes := FPool.FSieve.GetNext(LValue);
-      if LRes then //GENERAL Log
-      begin
-        LStr := AnsiString(UIntToStr(UInt64(LValue)) + ' ');
-        FPool.FFileStream.Write(LStr[1], Length(LStr));
-      end;
-    finally
-      FPool.FCS.Release;
-    end;
-
-    if LRes then
-      FFileStream.Write(LStr[1], Length(LStr)) //Personal log
-    else
-      Terminate; //finalize work correctly
-  end;
-end;
-
-{ TPrimesWriterPool }
-
-constructor TPrimesWriterController.Create(const AMaxValue: TNumberAlias;
+constructor TPrimesWriterController.Create(const AMaxValue: TNumberValue;
   const AThreadCount: Integer; const AGeneralFileName: string);
 var
   I: Integer;
@@ -120,13 +72,25 @@ begin
   end;
 end;
 
-procedure TPrimesWriterController.ReleaseThread(Thread: TThread);
+destructor TPrimesWriterController.Destroy;
+begin
+  TerminateThreads;
+
+  FFileStream.Free;
+  FCS.Free;
+  FSieve.Free;
+  FThreads.Free;
+
+  inherited;
+end;
+
+procedure TPrimesWriterController.RemoveThread(AThread: TThread);
 var
   LIndex: Integer;
 begin
   FCS.Acquire;
   try
-    LIndex := FThreads.IndexOf(Thread);
+    LIndex := FThreads.IndexOf(AThread);
     if LIndex >= 0 then
       FThreads.Delete(LIndex);
   finally
@@ -141,26 +105,61 @@ begin
   for I := 0 to FThreads.Count - 1 do
     TThread(FThreads[I]).Terminate; //completing destruct sequences: TThread.Terminate -> TThread.Free(FreeOnTerminate = True) -> TPrimesWriterPool.ReleaseThread - remove from list
 
-  while FThreads.Count > 0 do
-    Sleep(100); //waiting while threads terminating
-end;
-
-destructor TPrimesWriterController.Destroy;
-begin
-  TerminateThreads;
-
-  FreeAndNil(FThreads);
-
-  FSieve.Free;
-  FFileStream.Free;
-  FCS.Free;
-
-  inherited;
+  while Working do
+    Sleep(100); //wait, while threads terminating
 end;
 
 function TPrimesWriterController.GetWorking: Boolean;
 begin
   Result := FThreads.Count > 0;
+end;
+
+{ TPrimesWriterThread }
+
+constructor TPrimesWriterThread.Create(const AController: TPrimesWriterController;
+  const APersonalFileName: string);
+begin
+  FFileStream := TFileStream.Create(APersonalFileName, fmCreate);
+  FController := AController;
+
+  inherited Create;
+  FreeOnTerminate := True;
+end;
+
+destructor TPrimesWriterThread.Destroy;
+begin
+  FController.RemoveThread(Self); //notify pool about destruction
+
+  FFileStream.Free;
+
+  inherited;
+end;
+
+procedure TPrimesWriterThread.Execute;
+var
+  LValue: TNumberValue;
+  LStr: AnsiString;
+  LRes: Boolean;
+begin
+  while (not Terminated) do
+  begin
+    FController.FCS.Acquire;
+    try
+      LRes := FController.FSieve.GetNext(LValue);
+      if LRes then //GENERAL Log
+      begin
+        LStr := AnsiString(UIntToStr(UInt64(LValue)) + ' ');
+        FController.FFileStream.Write(LStr[1], Length(LStr));
+      end;
+    finally
+      FController.FCS.Release;
+    end;
+
+    if LRes then
+      FFileStream.Write(LStr[1], Length(LStr)) //Personal log
+    else
+      Terminate; //finalize work correctly
+  end;
 end;
 
 end.

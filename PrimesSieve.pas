@@ -3,26 +3,24 @@ unit PrimesSieve;
 interface
 
 type
-  TNumberAlias = Cardinal; //Cardinal compatible with D7, else must be - NativeUInt - compiler depended size (x32 or x64) or partial arrays in sieve for UInt64
+  TNumberValue = Cardinal; //Cardinal compatible with D7, else must be - NativeUInt - compiler depended size (x32 or x64) or partial arrays in sieve for UInt64
   TPrimesSieve = class
   private
     FSieve: array of Boolean;
-    FCurrent: TNumberAlias;
-    FSize: TNumberAlias;
+    FCurrent: TNumberValue;
+    FSize: TNumberValue;
   public
-    constructor Create(ASize: TNumberAlias);
-    destructor Destroy; override;
-
-    function GetNext(out ANumber: TNumberAlias): Boolean;
+    constructor Create(ASize: TNumberValue);
+    function GetNext(out ANumber: TNumberValue): Boolean;
   end;
 
 implementation
 
 { TPrimesSieve }
 
-constructor TPrimesSieve.Create(ASize: TNumberAlias);
+constructor TPrimesSieve.Create(ASize: TNumberValue);
 var
-  l, k: TNumberAlias;
+  l, k: TNumberValue;
 begin
   FCurrent := 1;
   FSize := ASize;
@@ -46,14 +44,7 @@ begin
   end;
 end;
 
-destructor TPrimesSieve.Destroy;
-begin
-  FSieve := nil;
-
-  inherited;
-end;
-
-function TPrimesSieve.GetNext(out ANumber: TNumberAlias): Boolean;
+function TPrimesSieve.GetNext(out ANumber: TNumberValue): Boolean;
 begin
   while (FCurrent < FSize) do
   begin
